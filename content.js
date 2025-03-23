@@ -22,39 +22,58 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       // Greenhouse.io job extraction - specifically targeted
       console.log("Greenhouse.io site detected");
       
-      // Try to get job content from specific Greenhouse selectors
-      const jobContent = document.querySelector('#content') || document.querySelector('#app-container');
+      // Get the job content from the #content div which contains the job description
+      // First attempt - try to get main job description sections
+      const jobDescriptionDiv = document.getElementById('gh-job-content');
+      if (jobDescriptionDiv) {
+        console.log("Found the greenhouse job content div");
+        jobDescription = jobDescriptionDiv.innerText || '';
+      }
       
-      if (jobContent) {
-        // Get all content sections
-        const contentSections = jobContent.querySelectorAll('div, section');
-        let relevantContent = [];
+      // If that doesn't work, try another approach specifically for Greenhouse
+      if (!jobDescription || jobDescription.length < 100) {
+        console.log("Using alternative Greenhouse extraction");
         
-        // Look for sections that likely contain job information
-        contentSections.forEach(section => {
-          const text = section.innerText || '';
+        // Try to find the job content container
+        const contentContainer = document.querySelector('.content');
+        
+        if (contentContainer) {
+          // Get all paragraphs and list elements inside the content
+          const elements = contentContainer.querySelectorAll('p, ul, ol, li, div');
+          let extractedText = [];
           
-          // Filter for job description content
-          if (text.length > 100 && !text.includes('Apply') && !text.includes('Submit') && 
-              (text.includes('About') || 
-               text.includes('Responsibilities') || 
-               text.includes('Requirements') || 
-               text.includes('Qualifications') || 
-               text.includes('Role') ||
-               text.includes('What you'll') ||
-               text.includes('What you will'))) {
-            relevantContent.push(text);
+          elements.forEach(el => {
+            const text = el.innerText.trim();
+            if (text && text.length > 10) {
+              extractedText.push(text);
+            }
+          });
+          
+          if (extractedText.length > 0) {
+            jobDescription = extractedText.join('\n\n');
           }
-        });
-        
-        if (relevantContent.length > 0) {
-          jobDescription = relevantContent.join('\n\n');
-        } else {
-          // Fallback - just get the main content
-          const mainContent = document.querySelector('#content') || document.querySelector('main');
-          if (mainContent) {
-            jobDescription = mainContent.innerText;
-          }
+        }
+      }
+      
+      // Final fallback for Greenhouse
+      if (!jobDescription || jobDescription.length < 200) {
+        // Just get everything from the main content area
+        const mainContent = document.querySelector('#app-container') || document.querySelector('#main');
+        if (mainContent) {
+          console.log("Using fallback main content extraction");
+          jobDescription = mainContent.innerText;
+          
+          // Try to clean up the text to remove headers, footers, etc.
+          const lines = jobDescription.split('\n');
+          const cleanedLines = lines.filter(line => 
+            line.trim().length > 0 && 
+            !line.includes('Apply for this job') &&
+            !line.includes('Apply Now') &&
+            !line.includes('Share:') &&
+            !line.includes('Greenhouse')
+          );
+          
+          jobDescription = cleanedLines.join('\n');
         }
       }
     }

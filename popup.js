@@ -119,12 +119,66 @@ document.addEventListener('DOMContentLoaded', function() {
       customizeStatus.className = 'status';
       progressIndicator.style.display = 'block';
       
-      // Simulate progress (since we don't have real-time updates from the server)
+      // Store request start time for estimation
+      const startTime = new Date().getTime();
+      chrome.storage.local.set({ 
+        'processingJob': {
+          startTime: startTime,
+          jobDescription: jobDescription,
+          status: 'processing'
+        }
+      });
+      
+      // We'll use more realistic progress estimation
+      // Typically this process takes about 30-60 seconds
       let progress = 0;
+      let phase = 1; // 1=start, 2=processing, 3=finishing
+      
       const progressInterval = setInterval(() => {
-        progress += 5;
-        if (progress <= 90) {
-          progressBar.style.width = progress + '%';
+        // Calculate elapsed time in seconds
+        const elapsed = (new Date().getTime() - startTime) / 1000;
+        
+        if (elapsed < 5) {
+          // Phase 1: Initial API call and setup (0-10%)
+          progress = Math.min(10, elapsed * 2);
+        } else if (elapsed < 30) {
+          // Phase 2: Main AI processing (10-70%)
+          // Slower progress in the middle phase
+          progress = 10 + Math.min(60, (elapsed - 5) * (60/25));
+          phase = 2;
+        } else {
+          // Phase 3: Final processing and response (70-90%)
+          progress = 70 + Math.min(20, (elapsed - 30) * (20/20));
+          phase = 3;
+        }
+        
+        // Update progress bar
+        progressBar.style.width = progress + '%';
+        
+        // Update status text based on phase
+        if (phase === 1) {
+          customizeStatus.textContent = 'Starting the customization process...';
+        } else if (phase === 2) {
+          customizeStatus.textContent = 'AI is analyzing and customizing your resume...';
+        } else {
+          customizeStatus.textContent = 'Almost done! Finalizing your resume...';
+        }
+        
+        // Prevent going past 90% until we get actual completion
+        if (progress >= 90) {
+          progress = 90;
+          clearInterval(progressInterval);
+          
+          // Set a maximum timeout in case the request never completes
+          setTimeout(() => {
+            clearInterval(progressInterval);
+            progressIndicator.style.display = 'none';
+            customizeStatus.textContent = 'Request timed out. Please try again.';
+            customizeStatus.className = 'status error';
+            
+            // Clear the processing job
+            chrome.storage.local.remove('processingJob');
+          }, 120000); // 2 minute maximum timeout
         }
       }, 1000);
       
@@ -145,17 +199,55 @@ document.addEventListener('DOMContentLoaded', function() {
         clearInterval(progressInterval);
         progressBar.style.width = '100%';
         
+        // Clear the processing job status
+        chrome.storage.local.remove('processingJob');
+        
         setTimeout(() => {
           progressIndicator.style.display = 'none';
           
-          if (data.status === 'success') {
-            document.getElementById('customizedResume').value = data.data.customizedResume;
+          // Handle different response formats from n8n
+          let customizedContent = '';
+          let success = false;
+          
+          if (data.status === 'success' && data.data && data.data.customizedResume) {
+            // Standard format we expect
+            customizedContent = data.data.customizedResume;
+            success = true;
+          } else if (typeof data === 'string') {
+            // Plain text response
+            customizedContent = data;
+            success = true;
+          } else if (data.text) {
+            // Alternate format with direct text property
+            customizedContent = data.text;
+            success = true;
+          } else if (data.customizedResume) {
+            // Direct customizedResume property
+            customizedContent = data.customizedResume;
+            success = true;
+          } else {
+            // Try to find any text-like property in the response
+            for (const key in data) {
+              if (typeof data[key] === 'string' && data[key].length > 100) {
+                customizedContent = data[key];
+                success = true;
+                break;
+              }
+            }
+          }
+          
+          if (success) {
+            document.getElementById('customizedResume').value = customizedContent;
             customizeStatus.textContent = 'Resume customized successfully!';
             customizeStatus.className = 'status success';
             resultContainer.classList.remove('hidden');
+            
+            // Save the customized resume
+            chrome.storage.local.set({ 'customizedResume': customizedContent });
           } else {
-            customizeStatus.textContent = 'Error: ' + (data.message || 'Unknown error');
+            customizeStatus.textContent = 'Error: Invalid response format. Check n8n workflow output format.';
             customizeStatus.className = 'status error';
+            console.error('Invalid response format:', data);
           }
         }, 500);
       })
@@ -215,9 +307,46 @@ document.addEventListener('DOMContentLoaded', function() {
   });
   
   // Load any saved data when popup opens
-  chrome.storage.local.get(['resumeContent'], function(result) {
+  chrome.storage.local.get(['resumeContent', 'customizedResume', 'jobDescription', 'processingJob'], function(result) {
+    // Restore resume content
     if (result.resumeContent) {
       resumeContent.value = result.resumeContent;
     }
+    
+    // Restore job description
+    if (result.jobDescription) {
+      document.getElementById('jobDescription').value = result.jobDescription;
+    }
+    
+    // Restore customized resume if available
+    if (result.customizedResume) {
+      document.getElementById('customizedResume').value = result.customizedResume;
+      resultContainer.classList.remove('hidden');
+    }
+    
+    // Check if we have an in-progress job
+    if (result.processingJob && result.processingJob.status === 'processing') {
+      // We have a job in progress, show its status
+      const elapsed = (new Date().getTime() - result.processingJob.startTime) / 1000;
+      
+      // If it's been less than 3 minutes, consider it still active
+      if (elapsed < 180) {
+        customizeStatus.textContent = 'Resume customization in progress. Reopen extension after a minute to check status.';
+        customizeStatus.className = 'status';
+        
+        // Restore job description
+        if (result.processingJob.jobDescription) {
+          document.getElementById('jobDescription').value = result.processingJob.jobDescription;
+        }
+      } else {
+        // It's been too long, probably failed
+        chrome.storage.local.remove('processingJob');
+      }
+    }
+  });
+  
+  // Save job description when it changes
+  document.getElementById('jobDescription').addEventListener('input', function() {
+    chrome.storage.local.set({ 'jobDescription': this.value });
   });
 });
