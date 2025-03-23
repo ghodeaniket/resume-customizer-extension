@@ -9,7 +9,7 @@
     "scripting"
   ],
   "host_permissions": [
-    "http://localhost:5678/*"
+    "https://n8n.cognitoapps.in/*"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -21,7 +21,12 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://*.linkedin.com/jobs/*", "https://*.indeed.com/*"],
+      "matches": [
+        "https://*.linkedin.com/jobs/*", 
+        "https://*.indeed.com/*",
+        "https://*.greenhouse.io/*",
+        "https://boards.greenhouse.io/*/*"
+      ],
       "js": ["content.js"]
     }
   ],
