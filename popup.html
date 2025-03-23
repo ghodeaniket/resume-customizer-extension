@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Resume Customizer</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      width: 320px;
+      padding: 10px;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    textarea {
+      width: 100%;
+      min-height: 100px;
+      resize: vertical;
+    }
+    button {
+      background-color: #4285f4;
+      border: none;
+      color: white;
+      padding: 8px 16px;
+      text-align: center;
+      font-size: 14px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    button:hover {
+      background-color: #3b78e7;
+    }
+    .status {
+      margin-top: 10px;
+      color: #555;
+      font-style: italic;
+    }
+    .tabs {
+      display: flex;
+      margin-bottom: 10px;
+    }
+    .tab {
+      flex: 1;
+      text-align: center;
+      padding: 8px;
+      cursor: pointer;
+      border-bottom: 2px solid #ddd;
+    }
+    .tab.active {
+      border-bottom: 2px solid #4285f4;
+      font-weight: bold;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <h2>Resume Customizer</h2>
+  
+  <div class="tabs">
+    <div class="tab active" data-tab="setup">Setup</div>
+    <div class="tab" data-tab="customize">Customize</div>
+    <div class="tab" data-tab="result">Result</div>
+  </div>
+  
+  <div class="container">
+    <div id="setup" class="tab-content active">
+      <h3>Upload Your Resume</h3>
+      <textarea id="resumeContent" placeholder="Paste your resume content here..."></textarea>
+      <button id="saveResume">Save Resume</button>
+      <div class="status" id="setupStatus"></div>
+    </div>
+    
+    <div id="customize" class="tab-content">
+      <h3>Job Description</h3>
+      <button id="extractJobDescription">Extract from Page</button>
+      <textarea id="jobDescription" placeholder="Job description will appear here..."></textarea>
+      <button id="customizeResume">Customize Resume</button>
+      <div class="status" id="customizeStatus"></div>
+    </div>
+    
+    <div id="result" class="tab-content">
+      <h3>Customized Resume</h3>
+      <textarea id="customizedResume" readonly></textarea>
+      <button id="copyResume">Copy to Clipboard</button>
+      <button id="downloadResume">Download as TXT</button>
+      <div class="status" id="resultStatus"></div>
+    </div>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>
