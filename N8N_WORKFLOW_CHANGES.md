@@ -27,7 +27,30 @@ Update the webhook node in your n8n workflow:
 
 ## 2. Response Format
 
-Update the "Respond to Webhook" node to return a proper JSON response:
+The extension now supports multiple response formats from the n8n workflow:
+
+### Option 1: Plain Text Response (Simplest)
+
+Update the "Respond to Webhook" node to return plain text:
+
+```json
+{
+  "parameters": {
+    "respondWith": "text",
+    "responseBody": "={{ $json.text }}",
+    "options": {
+      "responseCode": 200
+    }
+  },
+  "name": "Respond to Webhook"
+}
+```
+
+This is the simplest option and appears to match what your workflow is currently sending.
+
+### Option 2: JSON Response (More Structured)
+
+Alternatively, if you prefer a more structured response:
 
 ```json
 {
@@ -47,16 +70,7 @@ Update the "Respond to Webhook" node to return a proper JSON response:
 }
 ```
 
-This ensures that the response from n8n has the format:
-
-```json
-{
-  "status": "success",
-  "data": {
-    "customizedResume": "Your customized resume content here..."
-  }
-}
-```
+The extension supports both formats, so you can choose whichever is easier to implement in your workflow.
 
 ## 3. Input Validation and Error Handling
 

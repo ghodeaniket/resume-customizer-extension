@@ -194,7 +194,15 @@ document.addEventListener('DOMContentLoaded', function() {
           resumeContent: result.resumeContent
         })
       })
-      .then(response => response.json())
+      .then(response => {
+        // Check if the response is JSON or text
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          return response.json();
+        } else {
+          return response.text(); // Handle text response
+        }
+      })
       .then(data => {
         clearInterval(progressInterval);
         progressBar.style.width = '100%';
@@ -209,43 +217,61 @@ document.addEventListener('DOMContentLoaded', function() {
           let customizedContent = '';
           let success = false;
           
-          if (data.status === 'success' && data.data && data.data.customizedResume) {
-            // Standard format we expect
-            customizedContent = data.data.customizedResume;
-            success = true;
-          } else if (typeof data === 'string') {
-            // Plain text response
+          console.log("Response received:", data);
+          
+          if (typeof data === 'string') {
+            // Plain text response - most likely case based on the error
             customizedContent = data;
             success = true;
-          } else if (data.text) {
+            console.log("Detected plain text response");
+          } else if (data && data.status === 'success' && data.data && data.data.customizedResume) {
+            // Standard JSON format we expect
+            customizedContent = data.data.customizedResume;
+            success = true;
+            console.log("Detected standard JSON response");
+          } else if (data && data.text) {
             // Alternate format with direct text property
             customizedContent = data.text;
             success = true;
-          } else if (data.customizedResume) {
+            console.log("Detected text property in JSON response");
+          } else if (data && data.customizedResume) {
             // Direct customizedResume property
             customizedContent = data.customizedResume;
             success = true;
-          } else {
+            console.log("Detected customizedResume property");
+          } else if (data) {
             // Try to find any text-like property in the response
             for (const key in data) {
               if (typeof data[key] === 'string' && data[key].length > 100) {
                 customizedContent = data[key];
                 success = true;
+                console.log("Found text content in property:", key);
                 break;
               }
             }
           }
           
           if (success) {
+            // Set the resume content
             document.getElementById('customizedResume').value = customizedContent;
             customizeStatus.textContent = 'Resume customized successfully!';
             customizeStatus.className = 'status success';
+            
+            // Make sure the result container is visible
             resultContainer.classList.remove('hidden');
+            
+            // Ensure the user sees the results by scrolling to them
+            resultContainer.scrollIntoView({ behavior: 'smooth' });
+            
+            // Focus on the resume content to make it obvious
+            setTimeout(() => {
+              document.getElementById('customizedResume').focus();
+            }, 500);
             
             // Save the customized resume
             chrome.storage.local.set({ 'customizedResume': customizedContent });
           } else {
-            customizeStatus.textContent = 'Error: Invalid response format. Check n8n workflow output format.';
+            customizeStatus.textContent = 'Error: Could not parse response. Check console for details.';
             customizeStatus.className = 'status error';
             console.error('Invalid response format:', data);
           }
@@ -276,7 +302,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 2000);
   });
   
-  // Download functionality
+  // Download as TXT functionality
   const downloadButton = document.getElementById('downloadResume');
   downloadButton.addEventListener('click', function() {
     const customizedResume = document.getElementById('customizedResume').value;
@@ -298,7 +324,75 @@ document.addEventListener('DOMContentLoaded', function() {
     URL.revokeObjectURL(url);
     
     const resultStatus = document.getElementById('resultStatus');
-    resultStatus.textContent = 'Downloaded!';
+    resultStatus.textContent = 'Downloaded as TXT!';
+    resultStatus.className = 'status success';
+    
+    setTimeout(() => {
+      resultStatus.textContent = '';
+    }, 2000);
+  });
+  
+  // Download as DOCX functionality (simple conversion)
+  const downloadWordButton = document.getElementById('downloadResumeWord');
+  downloadWordButton.addEventListener('click', function() {
+    const customizedResume = document.getElementById('customizedResume').value;
+    if (!customizedResume.trim()) {
+      const resultStatus = document.getElementById('resultStatus');
+      resultStatus.textContent = 'No content to download';
+      resultStatus.className = 'status error';
+      return;
+    }
+    
+    // This is a simple approach - for a better Word document,
+    // you'd use a library like docx.js, but that requires more setup
+    
+    // Create HTML with basic styling that Word can interpret
+    const htmlContent = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" 
+            xmlns:w="urn:schemas-microsoft-com:office:word" 
+            xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="utf-8">
+        <title>Customized Resume</title>
+        <!--[if gte mso 9]>
+        <xml>
+          <w:WordDocument>
+            <w:View>Print</w:View>
+            <w:Zoom>100</w:Zoom>
+          </w:WordDocument>
+        </xml>
+        <![endif]-->
+        <style>
+          body {
+            font-family: 'Calibri', sans-serif;
+            font-size: 12pt;
+            line-height: 1.5;
+          }
+          p {
+            margin: 0;
+            padding: 0;
+            margin-bottom: 10pt;
+          }
+        </style>
+      </head>
+      <body>
+        ${customizedResume.split('\n').map(line => `<p>${line || '&nbsp;'}</p>`).join('')}
+      </body>
+      </html>
+    `;
+    
+    const blob = new Blob([htmlContent], { type: 'application/vnd.ms-word' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'customized_resume.doc';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    const resultStatus = document.getElementById('resultStatus');
+    resultStatus.textContent = 'Downloaded as DOCX!';
     resultStatus.className = 'status success';
     
     setTimeout(() => {

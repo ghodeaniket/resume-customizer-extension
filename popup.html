@@ -144,10 +144,11 @@
       
       <div id="resultContainer" class="hidden">
         <h4>Your Customized Resume:</h4>
-        <textarea id="customizedResume" readonly></textarea>
+        <textarea id="customizedResume" readonly style="min-height: 200px; background-color: #f9f9f9; font-family: 'Courier New', monospace;"></textarea>
         <div class="button-row">
           <button id="copyResume">Copy to Clipboard</button>
-          <button id="downloadResume">Download as TXT</button>
+          <button id="downloadResume" class="secondary">Download as TXT</button>
+          <button id="downloadResumeWord" class="secondary">Download as DOCX</button>
         </div>
         <div class="status" id="resultStatus"></div>
       </div>
